@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.tom_roush.pdfbox.sample;
+package com.tom_roush.pdfbox.sample.signing;
 
 import com.tom_roush.pdfbox.io.IOUtils;
 
@@ -34,17 +34,17 @@ import java.io.OutputStream;
  *
  * @author Thomas Chojecki
  */
-class CMSProcessableInputStream implements CMSTypedData
+public class CMSProcessableInputStream implements CMSTypedData
 {
     private InputStream in;
     private final ASN1ObjectIdentifier contentType;
 
-    CMSProcessableInputStream(InputStream is)
+    public CMSProcessableInputStream(InputStream is)
     {
         this(new ASN1ObjectIdentifier(CMSObjectIdentifiers.data.getId()), is);
     }
 
-    CMSProcessableInputStream(ASN1ObjectIdentifier type, InputStream is)
+    public CMSProcessableInputStream(ASN1ObjectIdentifier type, InputStream is)
     {
         contentType = type;
         in = is;

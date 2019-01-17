@@ -9,21 +9,7 @@ import android.widget.Toast;
 
 import com.github.barteksc.pdfviewer.PDFView;
 import com.tom_roush.pdfbox.pdmodel.PDDocument;
-import com.tom_roush.pdfbox.pdmodel.interactive.digitalsignature.PDSignature;
-import com.tom_roush.pdfbox.pdmodel.interactive.digitalsignature.SignatureInterface;
-
-import org.spongycastle.cert.jcajce.JcaCertStore;
-import org.spongycastle.cms.CMSException;
-import org.spongycastle.cms.CMSSignedData;
-import org.spongycastle.cms.CMSSignedDataGenerator;
-
-import org.spongycastle.cms.SignerInfoGenerator;
-import org.spongycastle.cms.jcajce.JcaSignerInfoGeneratorBuilder;
-import org.spongycastle.operator.ContentSigner;
-import org.spongycastle.operator.DigestCalculatorProvider;
-import org.spongycastle.operator.OperatorCreationException;
-import org.spongycastle.operator.jcajce.JcaContentSignerBuilder;
-import org.spongycastle.operator.jcajce.JcaDigestCalculatorProviderBuilder;
+import com.tom_roush.pdfbox.sample.signing.PDFSigner;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
@@ -40,17 +26,13 @@ import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
-import java.security.cert.Certificate;
-import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
-import java.util.Calendar;
-import java.util.Collections;
 
-public class MainActivity extends Activity implements SignatureInterface {
+public class MainActivity extends Activity {
 
   File root;
   PDDocument document;
@@ -143,18 +125,11 @@ public class MainActivity extends Activity implements SignatureInterface {
   }
 
   public void signPdf(View v) {
-    PDSignature signature = new PDSignature();
-    signature.setFilter(PDSignature.FILTER_ADOBE_PPKLITE); // default filter
 
-    // subfilter for basic and PAdES Part 2 signatures
-    signature.setSubFilter(PDSignature.SUBFILTER_ADBE_PKCS7_DETACHED);
-    signature.setName("Eduard Cuba");
-    signature.setLocation("Zurich, ZH");
-    signature.setReason("Testing");
-    signature.setSignDate(Calendar.getInstance());
+    PDFSigner signer = new PDFSigner(getCertificate(), getPrivateKey());
 
     try {
-      document.addSignature(signature, this);
+      signer.signDocument(document);
       makeToast("Success");
     } catch (IOException e) {
       makeToast("Error: " + e.getMessage());
@@ -203,45 +178,15 @@ public class MainActivity extends Activity implements SignatureInterface {
     return null;
   }
 
-  protected Certificate getCertificate() {
+  protected X509Certificate getCertificate() {
     try {
       BufferedInputStream bis = new BufferedInputStream(assetManager.open("cert.pem"));
       CertificateFactory cf = CertificateFactory.getInstance("X.509");
-
-      return cf.generateCertificate(bis);
+      return (X509Certificate) cf.generateCertificate(bis);
     } catch (IOException | CertificateException e) {
       makeToast("Error: " + e.getMessage());
       e.printStackTrace();
     }
     return null;
-  }
-
-
-  @Override
-  public byte[] sign(InputStream content) throws IOException {
-
-    CMSSignedDataGenerator gen = new CMSSignedDataGenerator();
-    X509Certificate cert = (X509Certificate) getCertificate();
-    PrivateKey pk = getPrivateKey();
-
-    try {
-      ContentSigner sha1Signer = new JcaContentSignerBuilder("SHA256WithRSA").build(pk);
-      DigestCalculatorProvider dcp = new JcaDigestCalculatorProviderBuilder().build();
-      SignerInfoGenerator sig = new JcaSignerInfoGeneratorBuilder(dcp).build(sha1Signer, cert);
-      JcaCertStore certStore = new JcaCertStore(Collections.singletonList(cert));
-
-      gen.addSignerInfoGenerator(sig);
-      gen.addCertificates(certStore);
-
-      CMSProcessableInputStream msg = new CMSProcessableInputStream(content);
-      CMSSignedData signedData = gen.generate(msg, false);
-
-      return signedData.getEncoded();
-
-    } catch (OperatorCreationException | CertificateEncodingException | CMSException e) {
-      makeToast("Error: " + e.getMessage());
-      e.printStackTrace();
-      return null;
-    }
   }
 }
