@@ -108,12 +108,22 @@ public class MainActivity extends Activity implements SignatureInterface {
     }
   }
 
+  // FIXME: loading and signing a PDF twice damages the PDF
+  protected void getLocalPdf() {
+    try {
+      document = PDDocument.load(new File(root.getAbsolutePath() + "/Download/test.pdf"));
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+  }
+
   public void downloadPdf(View v) {
     makeToast("Loading");
     Thread thread = new Thread(new Runnable() {
       @Override
       public void run() {
         getRemotePdf();
+        // getLocalPdf();
         renderPdf();
       }
     });
