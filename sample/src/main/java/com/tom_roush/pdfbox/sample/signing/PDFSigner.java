@@ -26,7 +26,7 @@ import java.security.cert.X509Certificate;
 import java.util.Calendar;
 import java.util.Collections;
 
-public class PDFSigner implements SignatureInterface {
+public class PDFSigner {
 
   private X509Certificate certificate;
   private PrivateKey privateKey;
@@ -46,40 +46,42 @@ public class PDFSigner implements SignatureInterface {
   public void signDocument(PDDocument document) throws IOException {
 
     PDSignature signature = new PDSignature();
-    signature.setFilter(PDSignature.FILTER_ADOBE_PPKLITE); // default filter
+    signature.setFilter(PDSignature.FILTER_ADOBE_PPKLITE);
 
     // subfilter for basic and PAdES Part 2 signatures
     signature.setSubFilter(PDSignature.SUBFILTER_ADBE_PKCS7_DETACHED);
+
+    // TODO load this from the certificate or args
     signature.setName("Eduard Cuba");
     signature.setLocation("Zurich, ZH");
     signature.setReason("Testing");
     signature.setSignDate(Calendar.getInstance());
 
-    document.addSignature(signature, this);
+    document.addSignature(signature, new PDFContentSigner());
   }
 
-  @Override
-  public byte[] sign(InputStream content) throws IOException {
+  private class PDFContentSigner implements SignatureInterface {
+    @Override
+    public byte[] sign(InputStream content) throws IOException {
+      CMSSignedDataGenerator gen = new CMSSignedDataGenerator();
+      try {
+        ContentSigner sha1Signer = new JcaContentSignerBuilder("SHA256WithRSA").build(privateKey);
+        DigestCalculatorProvider dcp = new JcaDigestCalculatorProviderBuilder().build();
+        SignerInfoGenerator sig = new JcaSignerInfoGeneratorBuilder(dcp).build(sha1Signer, certificate);
+        JcaCertStore certStore = new JcaCertStore(Collections.singletonList(certificate));
 
-    CMSSignedDataGenerator gen = new CMSSignedDataGenerator();
+        gen.addSignerInfoGenerator(sig);
+        gen.addCertificates(certStore);
 
-    try {
-      ContentSigner sha1Signer = new JcaContentSignerBuilder("SHA256WithRSA").build(privateKey);
-      DigestCalculatorProvider dcp = new JcaDigestCalculatorProviderBuilder().build();
-      SignerInfoGenerator sig = new JcaSignerInfoGeneratorBuilder(dcp).build(sha1Signer, certificate);
-      JcaCertStore certStore = new JcaCertStore(Collections.singletonList(certificate));
+        CMSProcessableInputStream msg = new CMSProcessableInputStream(content);
+        CMSSignedData signedData = gen.generate(msg, false);
 
-      gen.addSignerInfoGenerator(sig);
-      gen.addCertificates(certStore);
+        return signedData.getEncoded();
 
-      CMSProcessableInputStream msg = new CMSProcessableInputStream(content);
-      CMSSignedData signedData = gen.generate(msg, false);
-
-      return signedData.getEncoded();
-
-    } catch (OperatorCreationException | CertificateEncodingException | CMSException e) {
-      e.printStackTrace();
-      return null;
+      } catch (OperatorCreationException | CertificateEncodingException | CMSException e) {
+        e.printStackTrace();
+        return null;
+      }
     }
   }
 }
